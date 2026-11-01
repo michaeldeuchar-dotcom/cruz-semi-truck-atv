@@ -105,7 +105,15 @@ cyl(.25,5,0xcccccc,semi).position.set(1.8,6,1);cyl(.25,5,0xcccccc,semi).position
 const hl1=box(.8,.6,.2,0xffffaa,semi);hl1.position.set(1.3,3.2,6.05);const hl2=hl1.clone();hl2.position.x=-1.3;semi.add(hl2);
 [[2,1,4],[-2,1,4],[2,1,-2],[-2,1,-2],[2,1,-3.6],[-2,1,-3.6]].forEach(a=>wheel(semi,...a));
 semi.position.set(60,0,0);let semiH=0,semiV=0;
-const trailer=new THREE.Group();scene.add(trailer);const TL=16,DECK=2.2;
+function makeCab(col){const g=new THREE.Group();scene.add(g);
+box(4,1,9,0x333333,g).position.set(0,1.5,0);box(4,4,4,col,g).position.set(0,4,2.5);box(3.6,1.6,.2,0x9be7ff,g).position.set(0,5,4.55);
+box(4,2,2,col,g).position.set(0,3,5);box(3.5,.6,.2,0xcccccc,g).position.set(0,2.4,6.05);
+cyl(.25,5,0xcccccc,g).position.set(1.8,6,1);cyl(.25,5,0xcccccc,g).position.set(-1.8,6,1);
+{const a=box(.8,.6,.2,0xffffaa,g);a.position.set(1.3,3.2,6.05);const b2=a.clone();b2.position.x=-1.3;g.add(b2)}
+[[2,1,4],[-2,1,4],[2,1,-2],[-2,1,-2],[2,1,-3.6],[-2,1,-3.6]].forEach(a=>wheel(g,...a));return g}
+const EX=[];let exI=0;function addEx(col,x,z,h){const g=makeCab(col);g.position.set(x,0,z);g.rotation.y=h;const e={g,H:h,V:0};g.userData.ex=e;EX.push(e);return e}
+addEx(0xd9443a,44,-30,0);const semi2=EX[0].g;
+const trailer=new THREE.Group();scene.add(trailer);const TL=26,DECK=2.2;
 box(4.4,.5,TL,0xff8800,trailer).position.set(0,DECK-.25,-TL/2);
 [[2.2,1,-TL+2],[-2.2,1,-TL+2],[2.2,1,-TL+4],[-2.2,1,-TL+4]].forEach(a=>wheel(trailer,...a));
 const rampPivot=new THREE.Group();rampPivot.position.set(0,DECK,-TL);trailer.add(rampPivot);
@@ -180,22 +188,23 @@ document.addEventListener('gesturestart',e=>e.preventDefault());
 // modes
 let mode='semi';const S=document.getElementById('S');const hud=document.getElementById('hud');
 function say(t){hud.textContent=t}
-function enter(v){mode=v;kid.visible=false;kLevel=0;S.textContent='OUT';snd(500,.1);snd(700,.12);if(v=='semi'&&towed){towed=false;semi.rotation.x=0;semi.position.y=0;clunk()}say(v=='semi'?'🚛 Driving the semi!':v=='tow'?'🛻 Driving the tow truck!':'🏍️ Riding the ATV!')}
-function swap(){if(mode!='foot'){const v=cur();const h=mode=='semi'?semiH:mode=='tow'?towH:atvH;
+function enter(v,g){if(v=='ex')exI=Math.max(0,EX.findIndex(e=>e.g===g));mode=v;kid.visible=false;kLevel=0;S.textContent='OUT';snd(500,.1);snd(700,.12);if(v=='semi'&&towed){towed=false;semi.rotation.x=0;semi.position.y=0;clunk()}say(v=='ex'?'🚚 Driving the red semi! Back it up the ramp onto the long trailer':v=='semi'?'🚛 Driving the semi!':v=='tow'?'🛻 Driving the tow truck!':'🏍️ Riding the ATV!')}
+function swap(){if(mode!='foot'){const v=cur();const h=mode=='semi'?semiH:mode=='ex'?EX[exI].H:mode=='tow'?towH:atvH;
   kH=h;kid.position.set(v.position.x+Math.cos(h)*4,0,v.position.z-Math.sin(h)*4);kid_y=0;kLevel=0;mode='foot';kid.visible=true;S.textContent='IN';say('🚶 Walking! Tap a truck or ATV to hop in');snd(400,.12)}
- else{{const c=[['semi',semi],['atv',atv],['tow',tow]].sort((a,b)=>kid.position.distanceTo(a[1].position)-kid.position.distanceTo(b[1].position));enter(c[0][0])}}}
+ else{{const c=[['semi',semi],...EX.map(e=>['ex',e.g]),['atv',atv],['tow',tow]].sort((a,b)=>kid.position.distanceTo(a[1].position)-kid.position.distanceTo(b[1].position));enter(c[0][0],c[0][1])}}}
 S.addEventListener('touchstart',e=>{e.preventDefault();swap()},{passive:false});S.addEventListener('click',e=>{if(!('ontouchstart'in window))swap()});
 const X=document.getElementById('X');function exitEl(e){e&&e.preventDefault();if(!elMoving)return;elMoving=false;kLevel=elY>6?1:0;elY=kLevel?EL_TOP:0;kid.position.set(CAVE.x+ELX-4,0,CAVE.z+(kLevel?-2:ELZ));elWas=false;snd(600,.15,'sine');say(kLevel?'🍩 Out at the snack room!':'🦇 Out in the Batcave!')}
 X.addEventListener('touchstart',exitEl,{passive:false});X.addEventListener('click',exitEl);
 // tap objects
 const ray=new THREE.Raycaster();
 function tap(x,y){ray.setFromCamera(new THREE.Vector2(x/innerWidth*2-1,-(y/innerHeight)*2+1),cam);
- const hs=ray.intersectObjects([semi,atv,trailer,house,tow,UT,LG],true).filter(h=>h.object!==rampHit);
+ const hs=ray.intersectObjects([semi,atv,trailer,house,tow,UT,LG,...EX.map(e=>e.g)],true).filter(h=>h.object!==rampHit);
  const top=o=>{while(o.parent&&o.parent!==scene)o=o.parent;return o};
  let who=hs.length?top(hs[0].object):null;
  if(!who&&ray.intersectObject(rampHit).length)who='ramp';
  if(mode=='foot'&&atvOn&&hs.some(h=>top(h.object)===atv))who=atv;
  if(who===semi){honk();if(mode=='foot')enter('semi');return}
+ if(who&&who.userData&&who.userData.ex){honk();if(mode=='foot')enter('ex',who);return}
  if(who===tow){const lz=tow.worldToLocal(hs[0].point.clone()).z;if(towed&&lz<-3.5){towed=false;semi.rotation.x=0;semi.position.y=0;clunk();say('🔓 Semi let go!');return}snd(180,.4,'sawtooth',.15);if(mode=='foot')enter('tow');return}
  if((mode=='semi'||mode=='tow')&&(who===trailer||who==='ramp'||who===UT||who===LG)){const g=who==='ramp'?trailer:who;if(g.userData.free){const f=FOL.find(q=>q.g===g);let hp;if(f.lead){hp=f.lead.localToWorld(new THREE.Vector3(0,0,f.off)).setY(0);if(f.lead.userData.free)hp=null}else hp=mode=='tow'?towHitch():semiHitch();
   if(hp&&hp.distanceTo(g.position)<16&&!(mode=='tow'&&towed)){if(!f.lead)puller=mode=='tow'?tow:semi;g.userData.free=0;g.userData.init=0;clunk();say('🔗 Clunk! '+f.name+' hooked!');return}else if(hp){say('Back up closer to hook the '+f.name);return}}}
@@ -206,7 +215,8 @@ function tap(x,y){ray.setFromCamera(new THREE.Vector2(x/innerWidth*2-1,-(y/inner
  if(who==='ramp'||who===trailer){const lz=who==='ramp'?-TL:trailer.worldToLocal(hs[0].point.clone()).z;
    if(lz<-TL*.5){toggleRamps();return}
    if(!trailer.userData.free){trailer.userData.free=1;clunk();say('🔓 Trailer unhooked! Back the semi up to it to hook')}return}
- if(who===house){sleep();return}}
+ if(who===house){sleep();return}
+ if(!who){const gp=new THREE.Vector3();if(ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),gp)&&gp.distanceTo(cam.position)<220)spawnSemi(gp)}}
 let lp=null;function atvUnder(x,y){ray.setFromCamera(new THREE.Vector2(x/innerWidth*2-1,-(y/innerHeight)*2+1),cam);return ray.intersectObject(atv,true).length>0}
 R.domElement.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];tap(t.clientX,t.clientY);if(atvUnder(t.clientX,t.clientY)){clearTimeout(lp);lp=setTimeout(()=>atvHome('✨ ATV home! (long press)'),1000)}},{passive:false});
 R.domElement.addEventListener('touchend',()=>clearTimeout(lp));R.domElement.addEventListener('touchcancel',()=>clearTimeout(lp));
@@ -216,7 +226,10 @@ const ov=document.getElementById('ov');let sleeping=false;
 let bedPos=null;function sleep(msg){if(sleeping)return;sleeping=true;bedPos=msg?kid.position.clone():null;clr();ov.style.display='flex';document.getElementById('ovt').innerHTML=msg||'🏠 Home sweet home!<br>Goodnight Cruz! 😴<br>Z z z';[523,440,349].forEach((f,i)=>setTimeout(()=>snd(f,.4,'sine',.15),i*350))}
 document.getElementById('ovb').addEventListener('click',()=>{ov.style.display='none';sleeping=false;ding();if(bedPos){kid.position.set(CAVE.x-10,0,CAVE.z+10)}else if(mode=='foot'){kid.position.set(HOUSE.x,0,HOUSE.z+10);kH=0}else{const v=cur();v.position.set(HOUSE.x,0,HOUSE.z+20)}say('☀️ Good morning!')});
 window.__onPlay=()=>{honk();say('🚛 Driving the semi! Purple button = OUT')};
-function cur(){return mode=='tow'?tow:mode=='semi'?semi:mode=='atv'?atv:kid}
+const COLS=[0xff2a2a,0xff8800,0xffd400,0x2fbf4f,0x00c8ff,0xff66cc,0x9b4dff,0xffffff];
+function spawnSemi(p){if(EX.length>=7){const k=EX.findIndex((e,i)=>i>0&&!(mode=='ex'&&i==exI));const o=EX.splice(k,1)[0];if(mode=='ex'&&k<exI)exI--;sparkle(o.g.position);scene.remove(o.g);for(let i=WH.length-1;i>=0;i--)if(WH[i].userData.p===o.g)WH.splice(i,1)}
+ const d=new THREE.Vector3();cam.getWorldDirection(d);const h=Math.atan2(d.x,d.z);const e=addEx(COLS[Math.random()*COLS.length|0],p.x,p.z,h);e.g.updateMatrixWorld();sparkle(p);snd(300,.25,'sine',.15,900);setTimeout(()=>snd(1200,.1,'triangle',.1),180);say('💨 Poof! A new semi! Walk up and tap it to drive');return e}
+function cur(){return mode=='ex'?EX[exI].g:mode=='tow'?tow:mode=='semi'?semi:mode=='atv'?atv:kid}
 // helpers
 const tmpV=new THREE.Vector3();
 function toTrailer(p){return trailer.worldToLocal(tmpV.copy(p).setY(0))}
@@ -226,13 +239,20 @@ function hAtD(p){let best=[0,0,null];for(const d of DECKS){const l=d.g.worldToLo
  if(l.z<=d.z0&&l.z>=d.z1)r=[d.h,0,d];else{const rz=d.z1-l.z;if(rz>=0&&rz<d.rl+.6&&d.down())r=[d.h*Math.max(0,1-rz/d.rl),rz<d.rl?d.sl:0,d]}
  if(r&&r[0]>best[0])best=r}return best}
 function hAt(p){return hAtD(p)}
+function hAtT(p){const s=DECKS.slice(1);DECKS.length=1;const r=hAtD(p);DECKS.push(...s);return r}
+function deckMove(o,H,V,dt){const np=o.position.clone();np.x+=Math.sin(H)*V*dt;np.z+=Math.cos(H)*V*dt;const y=o.position.y;const [nh]=hAtT(np);const off=y>.5&&nh<y-.3;
+ let jam=false;if(nh>DECK-.3){const l=trailer.worldToLocal(np.clone().setY(0));if(l.z>-5.6&&V>0===(Math.cos(H-trailer.rotation.y)>0))jam=true;for(const q of [...EX.map(e=>e.g),tow])if(q!==o&&q.userData.dk&&np.distanceTo(q.position)<11&&np.distanceTo(q.position)<o.position.distanceTo(q.position))jam=true}
+ if(nh-y<.8&&!off&&!jam){o.position.x=np.x;o.position.z=np.z}else V=0;const [h,sl,dk]=hAtT(o.position);o.position.y=h>=y?h:Math.max(h,y-dt*9);
+ const was=o.userData.dk;o.userData.dk=dk&&dk.g===trailer&&h>=dk.h-.01?1:0;if(o.userData.dk&&!was){clunk();say('🔒 Locked on the long trailer!')}if(!o.userData.dk&&was&&h<.1)say('🔓 Drove off the trailer');
+ o.rotation.order='YXZ';o.rotation.x+=((-sl*Math.cos(H-(dk?dk.g.rotation.y:0)))-o.rotation.x)*Math.min(1,dt*12);return V}
 function atvHeight(){return hAt(atv.position)[0]}
 function blockedByTrailer(p,y){const l=toTrailer(p);if(Math.abs(l.x)<2.6&&l.z<0.5&&l.z>-TL&&y<DECK-.3)return true;return false}
 // elevator
 let elY=0,elTarget=0,elMoving=false,elWas=false;const EL_TOP=12.3,EL_SPEED=EL_TOP/30;
 let t0=performance.now(),last=t0;const clock={t:0};
 function inRect(p,cx,cz,hw,hd){return Math.abs(p.x-cx)<hw&&Math.abs(p.z-cz)<hd}
-window.__S=()=>({mode,semiV,semiH,atvV,towed,sleeping,x:semi.position.x,z:semi.position.z,ax:atv.position.x,az:atv.position.z,wr:WH.map(w=>[w.rotation.x,w.userData.sg.rotation.y,w.userData.p.name||''])});
+window.__S=()=>({nEx:EX.length,ex:EX.map(e=>[e.g.position.x,e.g.position.y,e.g.position.z,e.g.userData.dk]),tw:[tow.position.x,tow.position.y,tow.position.z,tow.userData.dk],tr:[trailer.position.x,trailer.position.z,trailer.rotation.y],mode,semiV,semiH,atvV,towed,sleeping,x:semi.position.x,z:semi.position.z,ax:atv.position.x,az:atv.position.z,wr:WH.map(w=>[w.rotation.x,w.userData.sg.rotation.y,w.userData.p.name||''])});
+window.__X={semi2,tow,toggleRamps,EX,setS2H:h=>{EX[0].H=h},setTowH:h=>{towH=h},rampA:()=>rampA};
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;clock.t+=dt;
  const turn=(inp.L?1:0)-(inp.R?1:0),thr=(inp.G?1:0)-(inp.B?1:0);
  if(sleeping){R.render(scene,cam);return}
@@ -243,21 +263,24 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
  else{for(const L of LAUNCH){if(semiV>6&&Math.hypot(semi.position.x-L.x,semi.position.z-L.z)<5){semiAir=true;semiVY=14;launchTo=L.to;snd(200,.6,'sawtooth',.12,600);say('🚀 Whoooa! Jump!');break}}}
  if(inTunnel())semi.position.z=Math.max(TZ-3,Math.min(TZ+3,semi.position.z));semi.position.x+=Math.sin(semiH)*semiV*dt;semi.position.z+=Math.cos(semiH)*semiV*dt;semi.rotation.y=semiH;
  if(mode=='tow'){towV+=(thr*14-towV)*dt*(thr?1.3:2.5);if(Math.abs(towV)>.4)towH+=turn*dt*1.1*Math.sign(towV)}else towV*=.9;
- tow.position.x+=Math.sin(towH)*towV*dt;tow.position.z+=Math.cos(towH)*towV*dt;tow.rotation.y=towH;
+ if(towed||puller===tow){tow.position.x+=Math.sin(towH)*towV*dt;tow.position.z+=Math.cos(towH)*towV*dt;tow.position.y=0}else towV=deckMove(tow,towH,towV,dt);tow.rotation.y=towH;
+ EX.forEach((e,i)=>{if(mode=='ex'&&i==exI){e.V+=(thr*16-e.V)*dt*(thr?1.2:2.5);if(Math.abs(e.V)>.5)e.H+=turn*dt*.9*Math.sign(e.V)}else e.V*=.9;e.V=deckMove(e.g,e.H,e.V,dt);e.g.rotation.y=e.H});
  {const hp=tow.localToWorld(new THREE.Vector3(0,0,-6.5));const sf=semi.localToWorld(new THREE.Vector3(0,0,6.5));
-  if(!towed&&!semiAir&&towV<-.5&&Math.hypot(hp.x-sf.x,hp.z-sf.z)<3.5){towed=true;clunk();say('🔗 Semi hooked to tow truck!')}
+  if(!towed&&!semiAir&&tow.position.y<.3&&towV<-.5&&Math.hypot(hp.x-sf.x,hp.z-sf.z)<3.5){towed=true;clunk();say('🔗 Semi hooked to tow truck!')}
   if(towed){semiH=towH;semi.rotation.order='YXZ';semi.rotation.y=semiH;semi.rotation.x=-.08;semi.position.set(hp.x+Math.sin(towH)*-6.5,.5,hp.z+Math.cos(towH)*-6.5);semiV=towV;}
   else if(!semiAir)semi.position.y=Math.max(0,semi.position.y)}
  // carry ATV: remember its spot on its deck
+ const carryV=[...EX.map(e=>[e.g,()=>e.H,h=>e.H=h]),[tow,()=>towH,h=>towH=h]].filter(a=>a[0].userData.dk).map(a=>({a,l:trailer.worldToLocal(a[0].position.clone()),rel:a[1]()-trailer.rotation.y}));
  const carry=atvOn&&atvOn.g?{d:atvOn,l:atvOn.g.worldToLocal(atv.position.clone()),rel:atvH-atvOn.g.rotation.y}:null;
  const PU=puller===tow?{o:tow,h:towH,v:towV,b:6.8}:{o:semi,h:semiH,v:semiV,b:2.5};const hitch=new THREE.Vector3(PU.o.position.x-Math.sin(PU.h)*PU.b,0,PU.o.position.z-Math.cos(PU.h)*PU.b);
- {const tb=new THREE.Vector3(tow.position.x-Math.sin(towH)*6.8,0,tow.position.z-Math.cos(towH)*6.8);if(trailer.userData.free&&!towed&&mode=='tow'&&towV<-.3&&tb.distanceTo(trailer.position)<5){puller=tow;trailer.userData.free=0;clunk();say('🔗 Clunk! Trailer hooked to the tow truck!')}}
+ {const tb=new THREE.Vector3(tow.position.x-Math.sin(towH)*6.8,0,tow.position.z-Math.cos(towH)*6.8);if(trailer.userData.free&&!towed&&tow.position.y<.3&&mode=='tow'&&towV<-.3&&tb.distanceTo(trailer.position)<5){puller=tow;trailer.userData.free=0;clunk();say('🔗 Clunk! Trailer hooked to the tow truck!')}}
  for(const f of FOL){const g=f.g;const hp=f.lead?f.lead.localToWorld(new THREE.Vector3(0,0,f.off)).setY(0):hitch;
   if(!g.userData.init){g.position.copy(hp);g.rotation.y=f.lead?f.lead.rotation.y:PU.h;g.userData.init=1}
   if(!g.userData.free){const back=new THREE.Vector3(g.position.x-Math.sin(g.rotation.y)*f.len,0,g.position.z-Math.cos(g.rotation.y)*f.len);const dir=hp.clone().sub(back);
     g.position.copy(hp);g.rotation.y=Math.atan2(dir.x,dir.z);if(f.lead==null)g.position.y=puller===semi?Math.max(0,semi.position.y):0}
   else if(f.lead?(PU.v<-.3&&hp.distanceTo(g.position)<5):(mode=='semi'&&semiV<-.3&&semiHitch().distanceTo(g.position)<5&&(puller=semi))){g.userData.free=0;clunk();say('🔗 Clunk! '+f.name+' hooked!')}
   g.updateMatrixWorld()}
+ for(const c of carryV){const o=c.a[0],ky=o.position.y;o.position.copy(trailer.localToWorld(c.l));o.position.y=ky;c.a[2](trailer.rotation.y+c.rel);o.rotation.y=trailer.rotation.y+c.rel}
  if(carry){const ky=atv.position.y;atv.position.copy(carry.d.g.localToWorld(carry.l));atv.position.y=ky;atvH=carry.d.g.rotation.y+carry.rel}
  rampA+=((rampsDown?0:1)-rampA)*Math.min(1,dt*2.5);rampPivot.rotation.x=rampA>0.05?-rampA*1.3+0.37*(1-rampA):0.37;
  uA+=((uDown?0:1)-uA)*Math.min(1,dt*2.5);uPivot.rotation.x=uA>0.05?-uA*1.5+USLOPE*(1-uA):USLOPE;
@@ -274,7 +297,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
   const inside=hAt(atv.position)[0]-atv.position.y>.5;
   if((mode=="atv"&&thr&&mv<.01&&!atvOn)||inside)atvStuck+=dt;else atvStuck=0;
   if(atvStuck>1.2){atvStuck=0;atvHome('✨ ATV popped back home!')}}
- WH.forEach(w=>{const v=w.userData.p==tow?towV:w.userData.p==semi?semiV:w.userData.p==atv?atvV:((w.userData.p===trailer&&!trailer.userData.free)||(w.userData.p===UT&&!trailer.userData.free&&!UT.userData.free)||(w.userData.p===LG&&!trailer.userData.free&&!UT.userData.free&&!LG.userData.free)?(puller===tow?towV:semiV):0);w.rotation.x+=v*dt/w.userData.r;if(w.userData.front){const act=(w.userData.p==tow&&mode=='tow')||(w.userData.p==semi&&mode=='semi')||(w.userData.p==atv&&mode=='atv');const tgt=act?turn*.5:0;w.userData.sg.rotation.y+=(tgt-w.userData.sg.rotation.y)*Math.min(1,dt*10)}});
+ WH.forEach(w=>{const v=w.userData.p.userData.ex?w.userData.p.userData.ex.V:w.userData.p==tow?towV:w.userData.p==semi?semiV:w.userData.p==atv?atvV:((w.userData.p===trailer&&!trailer.userData.free)||(w.userData.p===UT&&!trailer.userData.free&&!UT.userData.free)||(w.userData.p===LG&&!trailer.userData.free&&!UT.userData.free&&!LG.userData.free)?(puller===tow?towV:semiV):0);w.rotation.x+=v*dt/w.userData.r;if(w.userData.front){const act=(mode=='ex'&&w.userData.p===EX[exI].g)||(w.userData.p==tow&&mode=='tow')||(w.userData.p==semi&&mode=='semi')||(w.userData.p==atv&&mode=='atv');const tgt=act?turn*.5:0;w.userData.sg.rotation.y+=(tgt-w.userData.sg.rotation.y)*Math.min(1,dt*10)}});
  // walker
  if(mode=='foot'){kH+=turn*dt*2.5;const sp=thr*7;const nx=kid.position.x+Math.sin(kH)*sp*dt,nz=kid.position.z+Math.cos(kH)*sp*dt;
   const lc=new THREE.Vector3(nx-CAVE.x,0,nz-CAVE.z);
@@ -306,7 +329,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
  bat.rotation.z=Math.sin(clock.t)*.1;
  if(hud.dataset.s!=score){hud.dataset.s=score}
  // camera
- const o=cur();const hh=mode=='tow'?towH:mode=='semi'?semiH:mode=='atv'?atvH:kH;const dist=mode=='tow'?18:mode=='semi'?22:mode=='atv'?12:9,hgt=mode=='tow'?9:mode=='semi'?11:mode=='atv'?6:5;
+ const o=cur();const hh=mode=='ex'?EX[exI].H:mode=='tow'?towH:mode=='semi'?semiH:mode=='atv'?atvH:kH;const dist=mode=='tow'?18:mode=='semi'||mode=='ex'?22:mode=='atv'?12:9,hgt=mode=='tow'?9:mode=='semi'||mode=='ex'?11:mode=='atv'?6:5;
  const cp=new THREE.Vector3(o.position.x-Math.sin(hh)*dist,o.position.y+hgt,o.position.z-Math.cos(hh)*dist);if(!window.__moved&&(thr||turn||mode!='semi'||Math.abs(semiV)>.2))window.__moved=1;if(!window.__moved){{const k=cam.aspect<1?2.4:1;cam.position.set(62-44*k,26*k,-16+2*k);cam.lookAt(62,0,-16)}}else{cam.position.lerp(cp,Math.min(1,dt*3));cam.lookAt(o.position.x,o.position.y+2,o.position.z)}
  if(window.__camO){cam.position.set(...__camO[0]);cam.lookAt(...__camO[1])}R.render(scene,cam);document.title.length;window.__state={mode,score,kLevel,elY,atvOn:!!atvOn}}
 requestAnimationFrame(loop);
